@@ -1,7 +1,6 @@
 defmodule NervesHubWWWWeb.DeviceView do
   use NervesHubWWWWeb, :view
 
-  alias NervesHubDevice.Presence
   alias NervesHubWWWWeb.LayoutView.DateTimeFormat, as: DateTimeFormat
 
   import NervesHubWWWWeb.LayoutView,
@@ -9,7 +8,7 @@ defmodule NervesHubWWWWeb.DeviceView do
 
   import NervesHubWWWWeb.OrgCertificateView, only: [format_serial: 1]
 
-  def devices_table_header(title, value, current_sort, sort_direction \\ :asc)
+  def devices_table_header(title, value, current_sort, sort_direction)
 
   def devices_table_header(title, value, value = _current_sort, sort_direction) do
     caret_class = if sort_direction == :asc, do: "up", else: "down"
