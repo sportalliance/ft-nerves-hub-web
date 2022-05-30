@@ -39,7 +39,7 @@ config :nerves_hub_web_core, NervesHubWebCore.Workers.FirmwaresTransferS3Ingress
 
 config :ex_aws, region: System.fetch_env!("AWS_REGION")
 
-config :ex_aws, :s3, host: System.get_env("AWS_HOST", "amazonaws.com")
+config :ex_aws, :s3, host: System.get_env("AWS_HOST", "s3.amazonaws.com")
 
 config :nerves_hub_device, NervesHubDeviceWeb.Endpoint, server: true
 
