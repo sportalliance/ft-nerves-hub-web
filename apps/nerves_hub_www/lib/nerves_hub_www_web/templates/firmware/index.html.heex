@@ -24,6 +24,7 @@
         <th>UUID</th>
         <th>Version</th>
         <th>Platform</th>
+        <th>Architecture</th>
         <th>Firmware key</th>
         <th>Uploaded on</th>
         <th></th>
@@ -46,6 +47,10 @@
           <%= firmware.platform %>
         </td>
         <td>
+          <div class="mobile-label help-text">Architecture</div>
+          <%= firmware.architecture %>
+        </td>
+        <td>
           <div class="mobile-label help-text">Firmware key</div>
           <div>
             <span class="badge"><%= format_signed(firmware, @org) %></span>
@@ -64,7 +69,7 @@
         <td class="actions">
           <div class="mobile-label help-text">Actions</div>
           <div class="dropdown options">
-            <a class="dropdown-toggle options" href="#" id={firmware.uuid} data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <a class="dropdown-toggle options" href="#" id={firmware.uuid} data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
               <div class="mobile-label pr-2">Open</div>
               <img src="/images/icons/more.svg" alt="options" />
             </a>

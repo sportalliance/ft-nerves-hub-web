@@ -1,11 +1,11 @@
 defaults: &defaults
   docker:
-    - image: nerveshub/docker-build:alpine-3.9
+    - image: nerveshub/docker-build:alpine-3.15.3
   working_directory: ~/repo
 
 remote_docker: &remote_docker
   setup_remote_docker:
-    version: 17.09.0-ce
+    version: 20.10.11
 
 docker_env: &docker_env
   run:
@@ -41,13 +41,32 @@ docker_save: &docker_save
         nerveshub/$APP_NAME:latest \
         -o /docker/$APP_NAME-latest.tar
 
+docker_import: &docker_import
+  run:
+    name: Import docker images
+    command: |
+      docker load \
+        -i /docker/$APP_NAME-$DOCKER_TAG.tar
+      docker load \
+        -i /docker/$APP_NAME-latest.tar
+
+docker_push: &docker_push
+  run:
+    name: Push docker images to dockerhub
+    command: |
+      docker login -u $DOCKER_USER -p $DOCKER_PASS
+      docker push \
+        nerveshub/$APP_NAME:$DOCKER_TAG
+      docker push \
+        nerveshub/$APP_NAME:latest
+
 version: 2.1
 orbs:
-  docker: circleci/docker@1.6.0
+  docker: circleci/docker@2.0.3
 jobs:
   fetch_deps:
     docker:
-      - image: hexpm/elixir:1.11.4-erlang-23.0.4-alpine-3.13.1
+      - image: hexpm/elixir:1.13.3-erlang-24.3.3-alpine-3.15.3
         environment:
           MIX_ENV: test
     working_directory: ~/app
@@ -64,7 +83,7 @@ jobs:
 
   test_elixir:
     docker:
-      - image: hexpm/elixir:1.11.4-erlang-23.0.4-alpine-3.13.1
+      - image: hexpm/elixir:1.13.3-erlang-24.3.3-alpine-3.15.3
         environment:
           MIX_ENV: test
           DATABASE_URL: postgres://db:db@localhost:5432/db
@@ -157,6 +176,45 @@ jobs:
           key: docker-api-{{ .Branch }}-{{ .Revision }}
           paths: "/docker"
 
+  push-www:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: echo "export APP_NAME=nerves_hub_www" >> $BASH_ENV
+      - <<: *remote_docker
+      - <<: *docker_env
+      - restore_cache:
+          keys:
+            - docker-www-{{ .Branch }}-{{ .Revision }}
+      - <<: *docker_import
+      - <<: *docker_push
+
+  push-device:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: echo "export APP_NAME=nerves_hub_device" >> $BASH_ENV
+      - <<: *remote_docker
+      - <<: *docker_env
+      - restore_cache:
+          keys:
+            - docker-device-{{ .Branch }}-{{ .Revision }}
+      - <<: *docker_import
+      - <<: *docker_push
+
+  push-api:
+    <<: *defaults
+    steps:
+      - checkout
+      - run: echo "export APP_NAME=nerves_hub_api" >> $BASH_ENV
+      - <<: *remote_docker
+      - <<: *docker_env
+      - restore_cache:
+          keys:
+            - docker-api-{{ .Branch }}-{{ .Revision }}
+      - <<: *docker_import
+      - <<: *docker_push
+
 workflows:
   version: 2
   pipeline:
@@ -183,3 +241,24 @@ workflows:
             context: org-global
             requires:
               - test_elixir
+        - push-www:
+            context: org-global
+            requires:
+              - build-www
+            filters:
+              branches:
+                only: main
+        - push-device:
+            context: org-global
+            requires:
+              - build-device
+            filters:
+              branches:
+                only: main
+        - push-api:
+            context: org-global
+            requires:
+              - build-api
+            filters:
+              branches:
+                only: main
