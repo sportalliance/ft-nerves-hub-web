@@ -67,7 +67,8 @@ defmodule NervesHubWebCore.MixProject do
       {:jason, "~> 1.2", override: true},
       {:ecto, "~> 3.4", override: true},
       {:mox, "~> 1.0", only: [:test, :dev]},
-      {:nimble_csv, "~> 1.1"}
+      {:nimble_csv, "~> 1.1"},
+      {:base62, "~> 1.2"}
     ]
   end
 end
