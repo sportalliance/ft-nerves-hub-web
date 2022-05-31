@@ -3,7 +3,7 @@ import Config
 host = System.get_env("HOST")
 
 config :ex_aws,
-  region: System.get_env("AWS_REGION")
+  region: {:system, "AWS_REGION"}
 
 # Configures Elixir's Logger
 config :logger, :console,
