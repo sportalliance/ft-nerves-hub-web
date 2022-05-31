@@ -47,6 +47,7 @@ defmodule NervesHubWebCore.MixProject do
     [
       {:phoenix, "~> 1.6"},
       {:phoenix_html, "~> 3.1"},
+      {:phoenix_live_view, "~> 0.16"},
       {:plug, "~> 1.7"},
       {:plug_cowboy, "~> 2.1"},
       {:ecto_sql, "~> 3.0"},
