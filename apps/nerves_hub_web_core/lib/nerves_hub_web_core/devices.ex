@@ -8,24 +8,25 @@ defmodule NervesHubWebCore.Devices do
     Devices.UpdatePayload,
     Deployments.Deployment,
     Firmwares,
+    Firmwares.Firmware,
     Firmwares.FirmwareMetadata,
     AuditLogs,
     AuditLogs.AuditLog,
+    Accounts,
     Accounts.Org,
-    Repo
+    Accounts.OrgKey,
+    Repo,
+    Products.Product,
+    Workers
   }
 
   alias NervesHubWebCore.Devices.{Device, DeviceCertificate, CACertificate}
+  alias NervesHubWebCore.TaskSupervisor, as: Tasks
 
-  def get_device(device_id) do
-    Device
-    |> Repo.get(device_id)
-  end
+  @min_fwup_delta_updatable_version ">=1.6.0"
 
-  def get_device!(device_id) do
-    Device
-    |> Repo.get!(device_id)
-  end
+  def get_device(device_id), do: Repo.get(Device, device_id)
+  def get_device!(device_id), do: Repo.get!(Device, device_id)
 
   def get_devices_by_org_id(org_id) do
     query =
@@ -147,14 +148,7 @@ defmodule NervesHubWebCore.Devices do
     %UpdatePayload{} = update_payload = resolve_update(device, deployment)
 
     if update_payload.update_available do
-      Phoenix.PubSub.broadcast(
-        NervesHubWeb.PubSub,
-        "device:#{device.id}",
-        %Phoenix.Socket.Broadcast{
-          event: "update",
-          payload: update_payload
-        }
-      )
+      broadcast(device, "update", update_payload)
     end
 
     update_payload
@@ -457,13 +451,12 @@ defmodule NervesHubWebCore.Devices do
   end
 
   def resolve_update(
-        %Device{firmware_metadata: %{uuid: uuid}} = device,
+        %Device{firmware_metadata: %{uuid: uuid, fwup_version: fwup_version}} = device,
         %Deployment{} = deployment
       ) do
     with {:ok, %{healthy: true}} <- verify_update_eligibility(device, deployment),
          true <- matches_deployment?(device, deployment),
          %Device{product: product} <- Repo.preload(device, :product),
-         fwup_version <- Map.get(device.firmware_metadata, :fwup_version),
          %{firmware: target} <- Repo.preload(deployment, :firmware) do
       source =
         case Firmwares.get_firmware_by_product_and_uuid(product, uuid) do
@@ -471,19 +464,53 @@ defmodule NervesHubWebCore.Devices do
           {:error, :not_found} -> nil
         end
 
-      {:ok, url} = Firmwares.get_firmware_url(source, target, fwup_version, product)
-      {:ok, meta} = Firmwares.metadata_from_firmware(target)
+      if delta_updatable?(source, target, product, fwup_version) do
+        case Firmwares.get_firmware_delta_by_source_and_target(source, target) do
+          {:ok, firmware_delta} ->
+            build_update_payload(firmware_delta, target, deployment)
 
-      %UpdatePayload{
-        update_available: true,
-        firmware_url: url,
-        firmware_meta: meta,
-        deployment: deployment,
-        deployment_id: deployment.id
-      }
+          {:error, :not_found} ->
+            :ok = Workers.FirmwareDeltaBuilder.start(source.id, target.id)
+            build_no_update_payload()
+        end
+      else
+        build_update_payload(target, target, deployment)
+      end
     else
-      _ -> %UpdatePayload{update_available: false}
+      _ -> build_no_update_payload()
     end
+  end
+
+  defp build_update_payload(target_or_delta_firmware, target, deployment) do
+    {:ok, url} = Firmwares.get_firmware_url(target_or_delta_firmware)
+    {:ok, meta} = Firmwares.metadata_from_firmware(target)
+
+    %UpdatePayload{
+      update_available: true,
+      firmware_url: url,
+      firmware_meta: meta,
+      deployment: deployment,
+      deployment_id: deployment.id
+    }
+  end
+
+  defp build_no_update_payload() do
+    %UpdatePayload{update_available: false}
+  end
+
+  @spec delta_updatable?(
+          source :: Firmware.t(),
+          target :: Firmware.t(),
+          Product.t(),
+          fwup_version :: String.t()
+        ) :: boolean()
+  def delta_updatable?(nil, _target, _product, _fwup_version), do: false
+
+  def delta_updatable?(source, target, product, fwup_version) do
+    product.delta_updatable and
+      target.delta_updatable and
+      source.delta_updatable and
+      Version.match?(fwup_version, @min_fwup_delta_updatable_version)
   end
 
   @doc """
@@ -553,29 +580,125 @@ defmodule NervesHubWebCore.Devices do
     update_device(device, %{deleted_at: nil})
   end
 
+  @doc """
+  Move a device to a different product
+
+  If the new target product is in a different organization, this will
+  attempt to also copy any firmware keys the device might be expecting
+  to the new organization. However, it is best effort only.
+
+  Moving a device will also trigger a deployment check to see if there
+  is an update available from the new product/org for the device. It is
+  up to the user to ensure the new device is configured with any new/different
+  firmware keys from the new org before moving otherwise the device
+  might fail to update because of an unknown key.
+  """
+  @spec move(Device.t() | [Device.t()], Product.t(), User.t()) :: Repo.transaction()
+  def move(%Device{} = device, product, user) do
+    product = Repo.preload(product, :org)
+    attrs = %{org_id: product.org_id, product_id: product.id}
+
+    _ = maybe_copy_firmware_keys(device, product.org)
+
+    audit_params = %{
+      log_description:
+        "user #{user.username} moved device #{device.identifier} to #{product.org.name} : #{product.name}"
+    }
+
+    source_product = %Product{id: device.product_id, org_id: device.org_id}
+
+    Multi.new()
+    |> Multi.run(:move, fn _, _ -> update_device(device, attrs) end)
+    |> Multi.run(:audit_device, fn _, _ ->
+      AuditLogs.audit(user, device, :update, audit_params)
+    end)
+    |> Multi.run(:audit_target, fn _, _ ->
+      AuditLogs.audit(user, product, :update, audit_params)
+    end)
+    |> Multi.run(:audit_source, fn _, _ ->
+      AuditLogs.audit(user, source_product, :update, audit_params)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{move: updated}} ->
+        broadcast(updated, "moved")
+        {:ok, updated}
+
+      err ->
+        err
+    end
+  end
+
+  @spec move_many([Device.t()], Product.t(), User.t()) :: %{
+          ok: [Device.t()],
+          error: [{Ecto.Multi.name(), any()}]
+        }
+  def move_many(devices, product, user) do
+    product = Repo.preload(product, :org)
+
+    Enum.map(devices, &Task.Supervisor.async(Tasks, __MODULE__, :move, [&1, product, user]))
+    |> Task.await_many(20_000)
+    |> Enum.reduce(%{ok: [], error: []}, fn
+      {:ok, updated}, acc -> %{acc | ok: [updated | acc.ok]}
+      {:error, name, changeset, _}, acc -> %{acc | error: [{name, changeset} | acc.error]}
+    end)
+  end
+
+  @spec get_devices_by_id([non_neg_integer()]) :: [Device.t()]
+  def get_devices_by_id(ids) when is_list(ids) do
+    from(d in Device, where: d.id in ^ids)
+    |> Repo.all()
+  end
+
+  def broadcast(%Device{id: id}, event, payload \\ %{}) do
+    Phoenix.PubSub.broadcast(
+      NervesHubWeb.PubSub,
+      "device:#{id}",
+      %Phoenix.Socket.Broadcast{event: event, payload: payload}
+    )
+  end
+
   defp failures_query(%Device{id: device_id}, %Deployment{id: deployment_id} = deployment) do
     deployment = Repo.preload(deployment, :firmware)
 
-    from(
-      al in AuditLog,
-      where: [
-        actor_id: ^deployment_id,
-        actor_type: ^to_string(Deployment),
-        resource_type: ^to_string(Device),
-        resource_id: ^device_id
-      ],
-      where:
-        fragment(
-          """
-          (params->>'firmware_uuid' = ?) AND
-          (params->>'send_update_message' = 'true')
-          """,
-          ^deployment.firmware.uuid
-        ),
-      # Handle edge case we may make 2 audit log events at the same time
-      distinct: true,
-      select: al.inserted_at
-    )
+    latest_healthy =
+      from(
+        al in AuditLog,
+        where: [resource_type: ^to_string(Device), resource_id: ^device_id],
+        where: fragment("(params->>'healthy' = 'true')"),
+        order_by: [desc: :inserted_at],
+        limit: 1,
+        select: al.inserted_at
+      )
+      |> Repo.one()
+
+    query =
+      from(
+        al in AuditLog,
+        where: [
+          actor_id: ^deployment_id,
+          actor_type: ^to_string(Deployment),
+          resource_type: ^to_string(Device),
+          resource_id: ^device_id
+        ],
+        where:
+          fragment(
+            """
+            (params->>'firmware_uuid' = ?) AND
+            (params->>'send_update_message' = 'true')
+            """,
+            ^deployment.firmware.uuid
+          ),
+        # Handle edge case we may make 2 audit log events at the same time
+        distinct: true,
+        select: al.inserted_at
+      )
+
+    if latest_healthy do
+      where(query, [al], al.inserted_at >= ^latest_healthy)
+    else
+      query
+    end
   end
 
   defp version_match?(_vsn, ""), do: true
@@ -587,4 +710,26 @@ defmodule NervesHubWebCore.Devices do
   defp tags_match?(device_tags, deployment_tags) do
     Enum.all?(deployment_tags, fn tag -> tag in device_tags end)
   end
+
+  def maybe_copy_firmware_keys(%{firmware_metadata: %{uuid: uuid}, org_id: source}, %Org{
+        id: target
+      }) do
+    existing_target_keys = from(k in OrgKey, where: [org_id: ^target], select: k.key)
+
+    from(
+      k in OrgKey,
+      join: f in Firmware,
+      on: [org_key_id: k.id],
+      where: f.uuid == ^uuid and k.org_id == ^source,
+      where: k.key not in subquery(existing_target_keys),
+      select: %{name: k.name, key: k.key, org_id: type(^target, :integer)}
+    )
+    |> Repo.one()
+    |> case do
+      %{} = attrs -> Accounts.create_org_key(attrs)
+      _ -> :ignore
+    end
+  end
+
+  def maybe_copy_firmware_keys(_old, _updated), do: :ignore
 end

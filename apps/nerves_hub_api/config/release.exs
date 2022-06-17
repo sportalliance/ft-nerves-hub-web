@@ -8,8 +8,7 @@ sync_nodes_optional =
   case System.fetch_env("SYNC_NODES_OPTIONAL") do
     {:ok, sync_nodes_optional} ->
       sync_nodes_optional
-      |> String.trim()
-      |> String.split(" ")
+      |> String.split(" ", trim: true)
       |> Enum.map(&String.to_atom/1)
 
     :error ->
@@ -42,7 +41,8 @@ config :nerves_hub_web_core, NervesHubWebCore.Mailer,
   server: System.fetch_env!("SES_SERVER"),
   port: System.fetch_env!("SES_PORT") |> String.to_integer(),
   username: System.fetch_env!("SMTP_USERNAME"),
-  password: System.fetch_env!("SMTP_PASSWORD")
+  password: System.fetch_env!("SMTP_PASSWORD"),
+  allow_signups?: System.get_env("ALLOW_SIGNUPS", "false") |> String.to_atom()
 
 host = System.fetch_env!("HOST")
 

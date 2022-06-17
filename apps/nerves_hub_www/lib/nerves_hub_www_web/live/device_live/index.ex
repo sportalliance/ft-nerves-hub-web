@@ -2,7 +2,7 @@ defmodule NervesHubWWWWeb.DeviceLive.Index do
   use NervesHubWWWWeb, :live_view
 
   alias NervesHubDevice.Presence
-  alias NervesHubWebCore.{Accounts, Devices, Firmwares, Products}
+  alias NervesHubWebCore.{Accounts, Devices, Firmwares, Products, Products.Product}
   alias NervesHubWWWWeb.DeviceView
 
   alias Phoenix.Socket.Broadcast
@@ -54,6 +54,8 @@ defmodule NervesHubWWWWeb.DeviceLive.Index do
       |> assign(:current_filters, @default_filters)
       |> assign(:currently_filtering, false)
       |> assign(:page_size_valid, true)
+      |> assign(:selected_devices, [])
+      |> assign(:target_product, nil)
       |> assign_display_devices()
 
     {:ok, socket}
@@ -219,6 +221,86 @@ defmodule NervesHubWWWWeb.DeviceLive.Index do
     end
   end
 
+  def handle_event("select", %{"id" => id_str}, socket) do
+    id = String.to_integer(id_str)
+
+    selected_devices =
+      if id in socket.assigns.selected_devices do
+        List.delete(socket.assigns.selected_devices, id)
+      else
+        [id | socket.assigns.selected_devices]
+      end
+
+    {:noreply, assign(socket, :selected_devices, selected_devices)}
+  end
+
+  def handle_event("deselect-all", _, socket) do
+    {:noreply, assign(socket, selected_devices: [])}
+  end
+
+  def handle_event("target-product", %{"product" => attrs}, socket) do
+    target =
+      case String.split(attrs, ":") do
+        [org_id_str, pid_str, name] ->
+          %Product{
+            id: String.to_integer(pid_str),
+            org_id: String.to_integer(org_id_str),
+            name: name
+          }
+
+        _ ->
+          # ignore attempted move if no product/org selected
+          nil
+      end
+
+    {:noreply, assign(socket, target_product: target)}
+  end
+
+  def handle_event("move-devices", _, socket) do
+    %{ok: successfuls} =
+      Devices.get_devices_by_id(socket.assigns.selected_devices)
+      |> Devices.move_many(socket.assigns.target_product, socket.assigns.user)
+
+    success_ids = Enum.map(successfuls, & &1.id)
+
+    selected_devices = for id <- socket.assigns.selected_devices, id not in success_ids, do: id
+
+    socket =
+      assign(socket, selected_devices: selected_devices)
+      |> assign_display_devices()
+
+    {:noreply, socket}
+  end
+
+  def handle_event(
+        "toggle_health_state",
+        %{"device-id" => device_id},
+        %{assigns: %{devices: devices, user: user}} = socket
+      ) do
+    device = Devices.get_device(device_id)
+
+    params = %{healthy: !device.healthy}
+
+    socket =
+      case Devices.update_device(device, params) do
+        {:ok, updated_device} ->
+          AuditLogs.audit!(user, device, :update, params)
+
+          devices =
+            Enum.map(devices, fn
+              device when device.id == updated_device.id -> updated_device
+              device -> device
+            end)
+
+          assign(socket, :devices, devices)
+
+        {:error, _changeset} ->
+          put_flash(socket, :error, "Failed to mark health state")
+      end
+
+    {:noreply, socket}
+  end
+
   def handle_info(
         %Broadcast{event: "presence_diff", payload: %{leaves: leaves}},
         %{assigns: %{org: org, product: product}} = socket
@@ -235,6 +317,13 @@ defmodule NervesHubWWWWeb.DeviceLive.Index do
   defp assign_statuses(org_id, product_id) do
     Devices.get_devices_by_org_id_and_product_id(org_id, product_id)
     |> sync_devices(%{joins: Presence.list("product:#{product_id}:devices"), leaves: %{}})
+  end
+
+  defp do_sort(%{assigns: %{current_sort: "selected"} = assigns} = socket) do
+    devices =
+      Enum.sort_by(assigns.devices, &(&1.id in assigns.selected_devices), assigns.sort_direction)
+
+    assign(socket, :devices, devices)
   end
 
   defp do_sort(%{assigns: %{devices: devices, current_sort: current_sort}} = socket) do
