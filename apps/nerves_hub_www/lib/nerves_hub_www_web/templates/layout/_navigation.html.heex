@@ -24,7 +24,7 @@
                 <ul class="dropdown-menu">
                   <div class="help-text">Select a product</div>
                   <div class="dropdown-divider"></div>
-                  <%= if user_org_products(@conn.assigns.user, org) !== [] do %>
+                  <%= if count_user_org_products(@conn.assigns.user, org) > 0 do %>
                     <%= for product <- take_user_org_products(@conn.assigns.user, org, 5) do %>
                       <li>
                         <%= active_link(@conn, to: Routes.device_path(@conn, :index, org.name, product.name), class_active: "active dropdown-item product", class_inactive: "dropdown-item product") do %>
