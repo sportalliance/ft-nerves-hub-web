@@ -57,5 +57,6 @@ config :nerves_hub_device, NervesHubDeviceWeb.Endpoint,
     fail_if_no_peer_cert: true,
     keyfile: "/etc/ssl/#{host}-key.pem",
     certfile: "/etc/ssl/#{host}.pem",
-    cacertfile: "/etc/ssl/ca.pem"
+    cacertfile: "/etc/ssl/ca.pem",
+    versions: [:"tlsv1.2"]
   ]
