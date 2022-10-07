@@ -1,13 +1,13 @@
-version: '3.3'
+version: "3.3"
 services:
   postgres:
-    image: mdillon/postgis:10
+    image: postgres:14
     ports:
-      - "2345:5432"
+      - "2432:5432"
     environment:
-      POSTGRES_USER: db
-      POSTGRES_PASSWORD: db
-      POSTGRES_DB: db
+      POSTGRES_USER: nerves_hub
+      POSTGRES_PASSWORD: nerves_hub
+      POSTGRES_DB: nerves_hub
       PGDATA: /data
     volumes:
       - ~/db/nerveshub/postgres:/data
