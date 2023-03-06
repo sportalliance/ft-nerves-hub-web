@@ -37,7 +37,7 @@ defmodule NervesHubWebCore.MixProject do
   def application do
     [
       mod: {NervesHubWebCore.Application, []},
-      extra_applications: [:logger, :jason, :inets],
+      extra_applications: [:logger, :jason, :inets, :base62],
       start_phases: [{:start_workers, []}]
     ]
   end
@@ -69,7 +69,8 @@ defmodule NervesHubWebCore.MixProject do
       {:ecto, "~> 3.4", override: true},
       {:mox, "~> 1.0", only: [:test, :dev]},
       {:nimble_csv, "~> 1.1"},
-      {:base62, "~> 1.2"}
+      {:base62, "~> 1.2"},
+      {:scrivener_ecto, "~> 2.7"}
     ]
   end
 end
