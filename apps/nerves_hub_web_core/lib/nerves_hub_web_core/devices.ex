@@ -613,6 +613,7 @@ defmodule NervesHubWebCore.Devices do
   def failure_rate_met?(%Device{} = device, %Deployment{} = deployment) do
     seconds_ago =
       Timex.shift(DateTime.utc_now(), seconds: -deployment.device_failure_rate_seconds)
+      |> NaiveDateTime.truncate(:second)
 
     failures_query(device, deployment)
     |> where([al], al.inserted_at >= ^seconds_ago)

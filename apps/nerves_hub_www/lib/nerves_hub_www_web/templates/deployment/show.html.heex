@@ -96,8 +96,9 @@
         <span class="badge"><%= @deployment.device_failure_threshold %></span>
       </div>
       <div>
-        <div class="help-text mb-1">Delta firmware updates</div>
-        <p class="badge"> <%= if @deployment.delta_updatable, do: "enabled", else: "disabled" %> </p>
+        <div class="help-text mb-1"> 
+          <p class="badge">Delta firmware updates <%= if @deployment.delta_updatable, do: "enabled", else: "disabled" %></p>
+        </div>
       </div>
     </div>
   </div>

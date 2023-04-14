@@ -639,7 +639,7 @@ defmodule NervesHubWebCore.DevicesTest do
     # Build a bunch of failures at quick rate
     Enum.each(1..5, fn i ->
       al = AuditLog.build(deployment, device, :update, %{send_update_message: true})
-      time = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second) |> Timex.shift(seconds: i)
+      time = NaiveDateTime.utc_now() |> shift(seconds: i)
       Repo.insert(%{al | inserted_at: time})
     end)
 
@@ -647,18 +647,18 @@ defmodule NervesHubWebCore.DevicesTest do
   end
 
   test "failure_rate_met? after marked healthy", %{deployment: deployment, device: device} do
-    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+    now = NaiveDateTime.utc_now()
 
     Enum.each(-1..-5, fn i ->
       al = AuditLog.build(deployment, device, :update, %{send_update_message: true})
-      time = now |> Timex.shift(seconds: i)
+      time = now |> shift(seconds: i)
       Repo.insert(%{al | inserted_at: time})
     end)
 
     assert Devices.failure_rate_met?(device, deployment)
 
     al = AuditLog.build(deployment, device, :update, %{healthy: true})
-    time = now |> Timex.shift(seconds: -3)
+    time = now |> shift(seconds: -3)
     Repo.insert(%{al | inserted_at: time})
 
     refute Devices.failure_rate_met?(device, deployment)
@@ -668,7 +668,7 @@ defmodule NervesHubWebCore.DevicesTest do
     # Build a bunch of failures for the device
     Enum.each(1..15, fn i ->
       al = AuditLog.build(deployment, device, :update, %{send_update_message: true})
-      time = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second) |> Timex.shift(minutes: i)
+      time = NaiveDateTime.utc_now() |> shift(minutes: i)
       Repo.insert(%{al | inserted_at: time})
     end)
 
@@ -676,18 +676,18 @@ defmodule NervesHubWebCore.DevicesTest do
   end
 
   test "failure_threshold_met? after marked healthy", %{deployment: deployment, device: device} do
-    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+    now = NaiveDateTime.utc_now()
 
     Enum.each(-1..-15, fn i ->
       al = AuditLog.build(deployment, device, :update, %{send_update_message: true})
-      time = now |> Timex.shift(minutes: i)
+      time = now |> shift(minutes: i)
       Repo.insert(%{al | inserted_at: time})
     end)
 
     assert Devices.failure_threshold_met?(device, deployment)
 
     al = AuditLog.build(deployment, device, :update, %{healthy: true})
-    time = now |> Timex.shift(minutes: -2)
+    time = now |> shift(minutes: -2)
     Repo.insert(%{al | inserted_at: time})
 
     refute Devices.failure_threshold_met?(device, deployment)
@@ -720,5 +720,11 @@ defmodule NervesHubWebCore.DevicesTest do
 
     # case where the source firmware does not exist
     assert Devices.delta_updatable?(nil, target, deployment, fwup_version) == false
+  end
+
+  defp shift(time, params) do
+    time
+    |> Timex.shift(params)
+    |> NaiveDateTime.truncate(:second)
   end
 end

@@ -118,7 +118,10 @@ defmodule NervesHubWebCore.Deployments do
   @spec failure_rate_met?(Deployment.t()) :: boolean()
   def failure_rate_met?(%Deployment{} = deployment) do
     deployment = Repo.preload(deployment, :firmware)
-    rate_seconds_ago = Timex.shift(DateTime.utc_now(), seconds: -deployment.failure_rate_seconds)
+
+    rate_seconds_ago =
+      Timex.shift(DateTime.utc_now(), seconds: -deployment.failure_rate_seconds)
+      |> NaiveDateTime.truncate(:second)
 
     from(
       al in NervesHubWebCore.AuditLogs.AuditLog,
