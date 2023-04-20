@@ -27,7 +27,7 @@ Additionally you will need to install [xdelta3](https://github.com/jmacd/xdelta)
 The instructions below use `asdf` which can be installed with the
 instructions below ([copied from asdf-vm.com](https://asdf-vm.com/#/core-manage-asdf-vm))
 
-```
+```sh
 git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.11.0
 # The following steps are for Bash, which is usually the default shell
 # If you’re using something else, you probably know the equivalent thing you need to do echo -e '\n. $HOME/.asdf/asdf.sh' >> ~/.bashrc
@@ -62,7 +62,7 @@ This application runs on port `8443` and it handles user's certificates. It can 
 is needed in order to run both applications. When you create certificates from `nerves_hub_ca` place them in dir:
 `nerves_hub_web/test/fixtures/ssl`.
 
-### local testing
+### Local testing
 Testing with `ft-reader` and `ft-reader-provisioning-service` requires custom certificates which can be generated from the [spa-nerves-hub-ca](https://github.com/sportalliance/spa-nerves-hub-ca) project from the `test-certs` branch. When new certificates are generated, make sure to rebuild the database with `make reset-db`. Then FT-Access and FT-Vending device will be regenerated with the new certificates. 
 
 Also check the global elixir and erlang settings with `asdf list erlang` and `asdf list elixir` . These versions are used for testing.
@@ -80,24 +80,30 @@ All other projects (ft-reader, ft-reader-provisioning-service and ft-nerves-hub-
 Testing the `ft-reader` project on the hardware requires a local dns resolver which resolves the 
 `device.nerves-hub.org` and `provisioning.nerves-hub.org` to the host (MacBook).
 
-### Option 1 (works only in "host" mode, where ft-access runs on the MacBook)
-add `/etc/hosts` entries
-     `127.0.0.1 nerves-hub.org`
-     `127.0.0.1 provisioning.nerves-hub.org`
-     `127.0.0.1 device.nerves-hub.org`
-     `127.0.0.1 api.nerves-hub.org`
+#### Option 1 (works only in "host" mode, where ft-access runs on the MacBook)
 
-### Option 2 Full test setup
+add `/etc/hosts` entries
+
+```text
+127.0.0.1 nerves-hub.org
+127.0.0.1 provisioning.nerves-hub.org
+127.0.0.1 device.nerves-hub.org
+127.0.0.1 api.nerves-hub.org
+```
+
+#### Option 2 Full test setup
+
 add the domains above to a local dns resolver and point them to the local's MacBook ip address.
 Then the hardware modules can be fully tested and firmware updates work as well.
 A FT-Access/Vending devices can be added to Nerveshub:
-1. ssh into the access/vending.
+
+1. ssh into the access/vending
 2. run `FittrackNervesHubLink.Configurator.generate_cert_csv`
 3. copy the output into a text editor and save it as csv file.
-4. login to the local Nerveshub web interface: 
+4. login to the local Nerveshub web interface:
    1. go to FT-Access/Vending device overview
    2. press `Import`
-   3. under `Upload a CSV file`: upload the generated CSV file
+   3. under `Upload a CSV file` upload the generated CSV file
    4. The certificate should be detected and the device can be added
    5. Press import (red arrow next to the device) or `Import all`
    6. done
