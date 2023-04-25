@@ -2,6 +2,7 @@ ARG ELIXIR_VERSION=1.14.4
 ARG ERLANG_VERSION=25.3
 ARG ALPINE_VERSION=3.17.2
 ARG NODE_VERSION=16.18.1
+ARG NERVES_HUB_RUNTIME=alpine-3.17.0
 
 # Fetch deps for building web assets
 FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${ERLANG_VERSION}-alpine-${ALPINE_VERSION} as deps
@@ -37,7 +38,7 @@ COPY --from=assets /build/apps/nerves_hub_www/priv/static apps/nerves_hub_www/pr
 RUN mix do phx.digest, release nerves_hub_www --overwrite
 
 # Release Container
-FROM nerveshub/runtime:alpine-${ALPINE_VERSION} as release
+FROM nerveshub/runtime:${NERVES_HUB_RUNTIME} as release
 
 RUN apk add 'fwup~=1.9' \
   --repository http://nl.alpinelinux.org/alpine/edge/community/ \
@@ -45,8 +46,7 @@ RUN apk add 'fwup~=1.9' \
 
 RUN apk --no-cache add xdelta3 zip unzip
 
-EXPOSE 80
-EXPOSE 443
+EXPOSE 80 443
 
 ENV LOCAL_IPV4=127.0.0.1
 
