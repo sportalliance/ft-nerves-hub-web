@@ -1,6 +1,7 @@
 ARG ELIXIR_VERSION=1.14.4
 ARG ERLANG_VERSION=25.3
 ARG ALPINE_VERSION=3.17.2
+ARG NERVES_HUB_RUNTIME=alpine-3.17.0
 
 # Elixir build container
 FROM hexpm/elixir:${ELIXIR_VERSION}-erlang-${ERLANG_VERSION}-alpine-${ALPINE_VERSION} as builder
@@ -17,7 +18,7 @@ RUN mix deps.clean --all && mix deps.get
 RUN mix release nerves_hub_device  --overwrite
 
 # Release Container
-FROM nerveshub/runtime:alpine-${ALPINE_VERSION} as release
+FROM nerveshub/runtime:${NERVES_HUB_RUNTIME} as release
 
 RUN apk add 'fwup~=1.9' \
   --repository http://nl.alpinelinux.org/alpine/edge/community/ \

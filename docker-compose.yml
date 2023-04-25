@@ -9,5 +9,5 @@ services:
       POSTGRES_PASSWORD: nerves_hub
       POSTGRES_DB: nerves_hub
       PGDATA: /data
-    volumes:
-      - ~/db/nerveshub/postgres:/data
+
+

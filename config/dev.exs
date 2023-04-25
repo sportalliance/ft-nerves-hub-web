@@ -5,7 +5,7 @@ web_port = 4000
 web_scheme = "http"
 
 ssl_dir =
-  (System.get_env("NERVES_HUB_CA_DIR") || Path.join([__DIR__, "../test/fixtures/ssl/"]))
+  (System.get_env("NERVES_HUB_CA_DIR") || Path.join(__DIR__, "../../spa-nerves-hub-ca/etc/ssl"))
   |> Path.expand()
 
 config :logger, :console, format: "[$level] $message\n"
