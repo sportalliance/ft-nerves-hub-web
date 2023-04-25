@@ -10,7 +10,7 @@ defmodule NervesHubWebCore.Products.Product do
   alias NervesHubWebCore.Repo
 
   @required_params [:name, :org_id]
-  @optional_params [:delta_updatable]
+  @optional_params []
 
   @type t :: %__MODULE__{}
 
@@ -19,13 +19,12 @@ defmodule NervesHubWebCore.Products.Product do
     has_many(:firmwares, Firmware)
     has_many(:product_users, ProductUser)
     has_many(:users, through: [:product_users, :user])
-    has_one(:jitp, CACertificate.JITP)
+    has_many(:jitp, CACertificate.JITP)
 
     belongs_to(:org, Org, where: [deleted_at: nil])
 
     field(:name, :string)
     field(:deleted_at, :utc_datetime)
-    field(:delta_updatable, :boolean, default: false)
 
     timestamps()
   end

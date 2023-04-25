@@ -290,8 +290,8 @@ defmodule NervesHubWebCore.DeploymentsTest do
         al = AuditLog.build(context.deployment, device, :update, %{send_update_message: true})
         time = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
         Repo.insert(al)
-        Repo.insert(%{al | inserted_at: Timex.shift(time, seconds: i)})
-        Repo.insert(%{al | inserted_at: Timex.shift(time, seconds: i + 5)})
+        Repo.insert(%{al | inserted_at: shift(time, seconds: i)})
+        Repo.insert(%{al | inserted_at: shift(time, seconds: i + 5)})
       end)
 
       context
@@ -313,5 +313,11 @@ defmodule NervesHubWebCore.DeploymentsTest do
 
       refute Deployments.failure_rate_met?(deployment)
     end
+  end
+
+  defp shift(time, params) do
+    time
+    |> Timex.shift(params)
+    |> NaiveDateTime.truncate(:second)
   end
 end

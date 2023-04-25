@@ -83,7 +83,7 @@ orbs:
 jobs:
   fetch_deps:
     docker:
-      - image: hexpm/elixir:1.13.3-erlang-24.3.3-alpine-3.15.3
+      - image: hexpm/elixir:1.14.2-erlang-25.2-alpine-3.15.6
         environment:
           MIX_ENV: test
     working_directory: ~/app
@@ -95,19 +95,19 @@ jobs:
       - run: mix local.rebar --force
       - run: mix do deps.get
       - save_cache:
-          key: mix-deps-v1-{{ .Branch }}-{{ checksum "mix.lock" }}
+          key: mix-deps-v2-{{ .Branch }}-{{ checksum "mix.lock" }}
           paths: "deps"
 
   test_elixir:
     docker:
-      - image: hexpm/elixir:1.13.3-erlang-24.3.3-alpine-3.15.3
+      - image: hexpm/elixir:1.14.2-erlang-25.2-alpine-3.15.6
         environment:
           MIX_ENV: test
           DATABASE_URL: postgres://db:db@localhost:5432/db
           SECRET_KEY_BASE: ${SECRET_KEY_BASE:-BGC824f8kh1IQPXK7bUmXDigrw404rA7rivR96vGv4bhMIRogiaFN7Z6R4duZClA}
           LIVE_VIEW_SIGNING_SALT: ${LIVE_VIEW_SIGNING_SALT:-2GiUN2NDLEnYT8I/3Q+XL6LGUGEKGogh}
           COVERALLS_REPO_TOKEN: UrUe0yTdaISMj214UUZgj0H1y79UlsTX2
-      - image: circleci/postgres:10.1-alpine
+      - image: cimg/postgres:10.22
         environment:
           POSTGRES_USER: db
           POSTGRES_DB: db
@@ -121,7 +121,7 @@ jobs:
       - run: mix local.rebar --force
       - restore_cache:
           keys:
-            - mix-deps-v1-{{ .Branch }}-{{ checksum "mix.lock" }}
+            - mix-deps-v2-{{ .Branch }}-{{ checksum "mix.lock" }}
       - run: mix compile
       - run:
           name: Wait for DB
@@ -142,7 +142,7 @@ jobs:
           path: ~/app
       - restore_cache:
           keys:
-            - mix-deps-v1-{{ .Branch }}-{{ checksum "../../../mix.lock" }}
+            - mix-deps-v2-{{ .Branch }}-{{ checksum "../../../mix.lock" }}
       - run: npm install
       - run:
           name: Verify formatting

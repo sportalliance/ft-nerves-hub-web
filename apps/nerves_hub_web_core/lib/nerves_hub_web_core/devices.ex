@@ -51,8 +51,80 @@ defmodule NervesHubWebCore.Devices do
 
     query
     |> Repo.exclude_deleted()
-    |> order_by(asc: :identifier)
     |> Repo.all()
+  end
+
+  def get_devices_by_org_id_and_product_id(org_id, product_id, opts) do
+    query =
+      from(
+        d in Device,
+        where: d.org_id == ^org_id,
+        where: d.product_id == ^product_id
+      )
+
+    pagination = Map.get(opts, :pagination, %{})
+    sorting = Map.get(opts, :sort, {:asc, :identifier})
+    filters = Map.get(opts, :filters, %{})
+
+    query
+    |> Repo.exclude_deleted()
+    |> order_by(^sort_devices(sorting))
+    |> filtering(filters)
+    |> Repo.paginate(pagination)
+  end
+
+  defp sort_devices({:asc, :last_communication}), do: {:asc_nulls_first, :last_communication}
+
+  defp sort_devices({:desc, :last_communication}), do: {:desc_nulls_last, :last_communication}
+
+  defp sort_devices(sort), do: sort
+
+  defp filtering(query, filters) do
+    Enum.reduce(filters, query, fn {key, value}, query ->
+      case {key, value} do
+        {_, ""} ->
+          query
+
+        {"_target", _} ->
+          query
+
+        {"connection", _value} ->
+          # TODO make this something in the database that we can query against
+          # where(query, [d], d.connection == ^value)
+          query
+
+        {"firmware_version", value} ->
+          where(query, [d], d.firmware_metadata["version"] == ^value)
+
+        {"healthy", value} ->
+          where(query, [d], d.healthy == ^value)
+
+        {"id", value} ->
+          where(query, [d], ilike(d.identifier, ^"#{value}%"))
+
+        {"tag", value} ->
+          case NervesHubWebCore.Types.Tag.cast(value) do
+            {:ok, tags} ->
+              # This query here joins the table back to itself to unnest `tags` in a
+              # way that is ILIKE-able. It's ugly but it works.
+              query =
+                query
+                |> join(
+                  :inner_lateral,
+                  [d],
+                  t in fragment("select unnest(tags) as tags from devices where id = ?", d.id)
+                )
+                |> group_by([d], d.id)
+
+              Enum.reduce(tags, query, fn tag, query ->
+                where(query, [d, t], ilike(t.tags, ^"#{tag}%"))
+              end)
+
+            {:error, _} ->
+              query
+          end
+      end
+    end)
   end
 
   def get_device_count_by_org_id(org_id) do
@@ -464,7 +536,7 @@ defmodule NervesHubWebCore.Devices do
           {:error, :not_found} -> nil
         end
 
-      if delta_updatable?(source, target, product, fwup_version) do
+      if delta_updatable?(source, target, deployment, fwup_version) do
         case Firmwares.get_firmware_delta_by_source_and_target(source, target) do
           {:ok, firmware_delta} ->
             build_update_payload(firmware_delta, target, deployment)
@@ -501,13 +573,13 @@ defmodule NervesHubWebCore.Devices do
   @spec delta_updatable?(
           source :: Firmware.t(),
           target :: Firmware.t(),
-          Product.t(),
+          Deployment.t(),
           fwup_version :: String.t()
         ) :: boolean()
-  def delta_updatable?(nil, _target, _product, _fwup_version), do: false
+  def delta_updatable?(nil, _target, _deployment, _fwup_version), do: false
 
-  def delta_updatable?(source, target, product, fwup_version) do
-    product.delta_updatable and
+  def delta_updatable?(source, target, deployment, fwup_version) do
+    deployment.delta_updatable and
       target.delta_updatable and
       source.delta_updatable and
       Version.match?(fwup_version, @min_fwup_delta_updatable_version)
@@ -541,6 +613,7 @@ defmodule NervesHubWebCore.Devices do
   def failure_rate_met?(%Device{} = device, %Deployment{} = deployment) do
     seconds_ago =
       Timex.shift(DateTime.utc_now(), seconds: -deployment.device_failure_rate_seconds)
+      |> NaiveDateTime.truncate(:second)
 
     failures_query(device, deployment)
     |> where([al], al.inserted_at >= ^seconds_ago)

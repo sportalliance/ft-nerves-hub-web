@@ -35,58 +35,69 @@
   <div class="col-lg-7">
     <h3 class="mb-2">Deployment Details</h3>
     <div class="display-box">
-      <div class="x2-grid">
-        <div class="gc-span-2">
-          <div class="help-text mb-1">Distributed to</div>
-          <%= if Enum.count(tags(@deployment)) > 0 do %>
-            <%= for tag <- tags(@deployment) do %>
-              <span class="badge">
-                <%= tag %>
-              </span>
-            <% end %>
-          <% else %>
-            <p class="text-muted">No tags selected, not being distributed</p>
+      <div class="">
+        <div class="help-text mb-1">Distributed to</div>
+        <%= if Enum.count(tags(@deployment)) > 0 do %>
+          <%= for tag <- tags(@deployment) do %>
+            <span class="badge">
+              <%= tag %>
+            </span>
           <% end %>
-        </div>
-        <div>
-          <div class="help-text mb-1">Firmware version</div>
-          <span class="badge ff-m"><%= firmware_summary(@deployment) %></span>
-        </div>
-        <div>
-          <div class="help-text mb-1">Version requirement</div>
-          <p><%= version(@deployment) %></p>
-        </div>
+        <% else %>
+          <p class="text-muted">No tags selected, not being distributed</p>
+        <% end %>
+      </div>
+      <div>
+        <div class="help-text mb-1">Firmware version</div>
+        <span> <a href={Routes.firmware_path(@socket, :show, @org.name, @product.name, @firmware.uuid)} class="badge ff-m"><%= firmware_summary(@firmware) %></a> </span>
+      </div>
+      <div>
+        <div class="help-text mb-1">Version requirement</div>
+        <p class="badge"><%= version(@deployment) %></p>
+      </div>
+      <div>
         <div>
           <div class="help-text mb-1 tooltip-label help-tooltip">
             <span>Failure Rate</span>
             <span class="tooltip-info"></span>
             <span class="tooltip-text"><%= help_message_for(:failure_rate) %></span>
           </div>
-          <p><%= @deployment.failure_rate_amount %> devices per <%= @deployment.failure_rate_seconds %> seconds</p>
         </div>
+        <span class="badge"><%= @deployment.failure_rate_amount %> devices per <%= @deployment.failure_rate_seconds %> seconds</span>
+      </div>
+      <div>
         <div>
           <div class="help-text mb-1 tooltip-label help-tooltip">
             <span>Failure Threshold</span>
             <span class="tooltip-info"></span>
             <span class="tooltip-text"><%= help_message_for(:failure_threshold) %></span>
           </div>
-          <p><%= @deployment.failure_threshold %></p>
         </div>
+        <span class="badge"><%= @deployment.failure_threshold %></span>
+      </div>
+      <div>
         <div>
           <div class="help-text mb-1 tooltip-label help-tooltip">
             <span>Device Failure Rate</span>
             <span class="tooltip-info"></span>
             <span class="tooltip-text"><%= help_message_for(:device_failure_rate) %></span>
           </div>
-          <p><%= @deployment.device_failure_rate_amount %> failures per <%= @deployment.device_failure_rate_seconds %> seconds</p>
         </div>
+        <span class="badge"><%= @deployment.device_failure_rate_amount %> failures per <%= @deployment.device_failure_rate_seconds %> seconds</span>
+      </div>
+      <div>
         <div>
           <div class="help-text mb-1 tooltip-label help-tooltip">
             <span>Device Failure Threshold</span>
             <span class="tooltip-info"></span>
             <span class="tooltip-text"><%= help_message_for(:device_failure_threshold) %></span>
           </div>
-          <p><%= @deployment.device_failure_threshold %></p>
+        </div>
+        <span class="badge"><%= @deployment.device_failure_threshold %></span>
+      </div>
+      <div>
+        <div class="help-text mb-1"> 
+          <p class="badge">Delta firmware updates <%= if @deployment.delta_updatable, do: "enabled", else: "disabled" %></p>
         </div>
       </div>
     </div>

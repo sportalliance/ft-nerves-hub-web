@@ -70,7 +70,7 @@ defmodule NervesHubWWWWeb.DeploymentController do
     params =
       params
       |> inject_conditions_map()
-      |> whitelist([:name, :conditions, :firmware_id])
+      |> whitelist([:name, :conditions, :firmware_id, :delta_updatable])
       |> Map.put(:org_id, org.id)
       |> Map.put(:is_active, false)
 
@@ -120,7 +120,8 @@ defmodule NervesHubWWWWeb.DeploymentController do
         "auth_user_id" => user.id,
         "org_id" => org.id,
         "product_id" => product.id,
-        "deployment_id" => deployment.id
+        "deployment_id" => deployment.id,
+        "firmware_id" => deployment.firmware_id
       }
     )
   end
@@ -154,7 +155,8 @@ defmodule NervesHubWWWWeb.DeploymentController do
       :failure_threshold,
       :firmware_id,
       :name,
-      :is_active
+      :is_active,
+      :delta_updatable
     ]
 
     params =
